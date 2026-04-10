@@ -7,6 +7,24 @@ This project demonstrates a simple distributed system using Docker containers:
 - A single load balancer (Nginx) that routes and balances traffic
 - PostgreSQL as the persistent data store
 
+## Pages and Features
+
+The frontend now includes five pages:
+
+1. `Dashboard` - Summary cards and recent visit feed.
+2. `Patients` - Searchable patient directory, create patient form, and detail panel.
+3. `Visits` - Filterable visit records and new visit form.
+4. `Analytics` - Diagnosis distribution and daily visit trend charts.
+5. `System` - API replica status, DB/API uptime, and live health information.
+
+New backend capabilities include:
+
+- Patient management (`GET/POST /api/patients`, `GET /api/patients/:id`)
+- Summary endpoint (`GET /api/summary`)
+- Visit filtering (`GET /api/records` query params)
+- Analytics endpoints (`GET /api/analytics/*`)
+- System metrics endpoint (`GET /api/system/status`)
+
 ## Architecture
 
 - `loadbalancer` routes:
@@ -61,8 +79,15 @@ docker stop <container_name>
 ## API
 
 - `GET /api/health`
+- `GET /api/system/status`
+- `GET /api/summary`
+- `GET /api/patients`
+- `GET /api/patients/:id`
+- `POST /api/patients`
 - `GET /api/records`
 - `POST /api/records`
+- `GET /api/analytics/diagnoses`
+- `GET /api/analytics/visits-by-day`
 
 Example payload:
 
