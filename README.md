@@ -36,11 +36,15 @@ Open:
 2. Stop one backend container:
 
 ```bash
-docker compose stop backend
+docker stop health-records-backend-1
 ```
 
 3. Keep refreshing and adding records; requests continue through remaining replicas.
-4. Stop one frontend container and refresh the browser; app should remain available.
+4. Stop one frontend container and refresh the browser; app should remain available:
+
+```bash
+docker stop health-records-frontend-1
+```
 
 To list containers with generated names:
 
