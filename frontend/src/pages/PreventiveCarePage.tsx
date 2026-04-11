@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import type { PreventiveCareEntry } from '../types'
 
@@ -16,6 +17,7 @@ function statusClass(status: PreventiveCareEntry['status']) {
 }
 
 export function PreventiveCarePage() {
+  const navigate = useNavigate()
   const [entries, setEntries] = useState<PreventiveCareEntry[]>([])
   const [daysThreshold, setDaysThreshold] = useState(180)
   const [search, setSearch] = useState('')
@@ -97,13 +99,13 @@ export function PreventiveCarePage() {
             </thead>
             <tbody>
               {entries.map((entry) => (
-                <tr key={entry.id}>
+                <tr key={entry.id} className="click-row" onClick={() => navigate(`/patients/${entry.id}`)}>
                   <td>
                     <strong>{entry.full_name}</strong>
                     <div>{entry.email || entry.phone || 'No contact details'}</div>
                   </td>
                   <td>{entry.last_visit || 'Never'}</td>
-                  <td>{entry.days_since_last_visit}</td>
+                  <td>{entry.days_since_last_visit ?? '-'}</td>
                   <td>{entry.total_visits}</td>
                   <td>
                     <span className={`status-pill ${statusClass(entry.status)}`}>

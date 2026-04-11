@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import type { HealthRecord, Patient } from '../types'
 
 export function VisitsPage() {
+  const navigate = useNavigate()
   const [records, setRecords] = useState<HealthRecord[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
   const [editingRecordId, setEditingRecordId] = useState<number | null>(null)
@@ -225,7 +227,15 @@ export function VisitsPage() {
             </thead>
             <tbody>
               {records.map((record) => (
-                <tr key={record.id}>
+                <tr
+                  key={record.id}
+                  className={record.patient_id ? 'click-row' : ''}
+                  onClick={() => {
+                    if (record.patient_id) {
+                      navigate(`/patients/${record.patient_id}`)
+                    }
+                  }}
+                >
                   <td>{record.id}</td>
                   <td>{record.patient_name}</td>
                   <td>{record.diagnosis}</td>
@@ -235,14 +245,20 @@ export function VisitsPage() {
                       <button
                         type="button"
                         className="ghost-button inline-ghost"
-                        onClick={() => onEditRecord(record)}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          onEditRecord(record)
+                        }}
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         className="ghost-button inline-ghost danger-button"
-                        onClick={() => void onDeleteRecord(record)}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          void onDeleteRecord(record)
+                        }}
                       >
                         Delete
                       </button>

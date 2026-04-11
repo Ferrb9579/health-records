@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
-import type { Patient, PatientDetails } from '../types'
+import type { Patient } from '../types'
 
 export function PatientsPage() {
+  const navigate = useNavigate()
   const [patients, setPatients] = useState<Patient[]>([])
-  const [selectedPatient, setSelectedPatient] = useState<PatientDetails | null>(null)
-  const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null)
   const [editingPatientId, setEditingPatientId] = useState<number | null>(null)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -18,6 +18,14 @@ export function PatientsPage() {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [dob, setDob] = useState('')
+  const [gender, setGender] = useState('')
+  const [bloodType, setBloodType] = useState('')
+  const [address, setAddress] = useState('')
+  const [emergencyContactName, setEmergencyContactName] = useState('')
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState('')
+  const [insuranceProvider, setInsuranceProvider] = useState('')
+  const [allergies, setAllergies] = useState('')
+  const [notes, setNotes] = useState('')
 
   async function loadPatients(filter = search) {
     setLoading(true)
@@ -30,18 +38,6 @@ export function PatientsPage() {
       setError('Unable to load patient list.')
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function loadPatientDetails(patientId: number) {
-    setError('')
-
-    try {
-      const result = await api.getPatientDetails(patientId)
-      setSelectedPatient(result.data)
-      setSelectedPatientId(patientId)
-    } catch {
-      setError('Unable to load selected patient details.')
     }
   }
 
@@ -90,6 +86,14 @@ export function PatientsPage() {
           email,
           phone,
           dob,
+          gender,
+          bloodType,
+          address,
+          emergencyContactName,
+          emergencyContactPhone,
+          insuranceProvider,
+          allergies,
+          notes,
         })
       } else {
         await api.createPatient({
@@ -97,6 +101,14 @@ export function PatientsPage() {
           email,
           phone,
           dob,
+          gender,
+          bloodType,
+          address,
+          emergencyContactName,
+          emergencyContactPhone,
+          insuranceProvider,
+          allergies,
+          notes,
         })
       }
 
@@ -104,12 +116,17 @@ export function PatientsPage() {
       setEmail('')
       setPhone('')
       setDob('')
+      setGender('')
+      setBloodType('')
+      setAddress('')
+      setEmergencyContactName('')
+      setEmergencyContactPhone('')
+      setInsuranceProvider('')
+      setAllergies('')
+      setNotes('')
       setEditingPatientId(null)
       await loadPatients(search)
       setSuccess(editingPatientId ? 'Patient updated successfully.' : 'Patient created successfully.')
-      if (selectedPatientId) {
-        await loadPatientDetails(selectedPatientId)
-      }
     } catch {
       setError(editingPatientId ? 'Failed to update patient.' : 'Failed to create patient.')
     } finally {
@@ -133,6 +150,14 @@ export function PatientsPage() {
     setEmail(patient.email || '')
     setPhone(patient.phone || '')
     setDob(patient.dob || '')
+    setGender(patient.gender || '')
+    setBloodType(patient.blood_type || '')
+    setAddress(patient.address || '')
+    setEmergencyContactName(patient.emergency_contact_name || '')
+    setEmergencyContactPhone(patient.emergency_contact_phone || '')
+    setInsuranceProvider(patient.insurance_provider || '')
+    setAllergies(patient.allergies || '')
+    setNotes(patient.notes || '')
     setError('')
     setSuccess('')
   }
@@ -143,6 +168,18 @@ export function PatientsPage() {
     setEmail('')
     setPhone('')
     setDob('')
+    setGender('')
+    setBloodType('')
+    setAddress('')
+    setEmergencyContactName('')
+    setEmergencyContactPhone('')
+    setInsuranceProvider('')
+    setAllergies('')
+    setNotes('')
+  }
+
+  function onOpenProfile(patientId: number) {
+    navigate(`/patients/${patientId}`)
   }
 
   async function onDeletePatient(patient: Patient) {
@@ -155,10 +192,6 @@ export function PatientsPage() {
 
     try {
       await api.deletePatient(patient.id)
-      if (selectedPatientId === patient.id) {
-        setSelectedPatient(null)
-        setSelectedPatientId(null)
-      }
       if (editingPatientId === patient.id) {
         onCancelEditing()
       }
@@ -178,7 +211,7 @@ export function PatientsPage() {
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by name, email, phone"
+            placeholder="Search by name, email, phone, address"
           />
           <button type="submit">Search</button>
           <button type="button" className="ghost-button inline-ghost" onClick={() => void onClearFilters()}>
@@ -207,8 +240,8 @@ export function PatientsPage() {
               {visiblePatients.map((patient) => (
                 <tr
                   key={patient.id}
-                  onClick={() => void loadPatientDetails(patient.id)}
-                  className={`click-row ${selectedPatientId === patient.id ? 'selected-row' : ''}`}
+                  onClick={() => onOpenProfile(patient.id)}
+                  className="click-row"
                 >
                   <td>{patient.full_name}</td>
                   <td>{patient.email || '-'}</td>
@@ -269,6 +302,53 @@ export function PatientsPage() {
             Date of Birth
             <input type="date" value={dob} onChange={(event) => setDob(event.target.value)} />
           </label>
+          <label>
+            Gender
+            <select value={gender} onChange={(event) => setGender(event.target.value)}>
+              <option value="">Not specified</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label>
+            Blood Type
+            <select value={bloodType} onChange={(event) => setBloodType(event.target.value)}>
+              <option value="">Unknown</option>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+            </select>
+          </label>
+          <label>
+            Address
+            <input value={address} onChange={(event) => setAddress(event.target.value)} />
+          </label>
+          <label>
+            Emergency Contact Name
+            <input value={emergencyContactName} onChange={(event) => setEmergencyContactName(event.target.value)} />
+          </label>
+          <label>
+            Emergency Contact Phone
+            <input value={emergencyContactPhone} onChange={(event) => setEmergencyContactPhone(event.target.value)} />
+          </label>
+          <label>
+            Insurance Provider
+            <input value={insuranceProvider} onChange={(event) => setInsuranceProvider(event.target.value)} />
+          </label>
+          <label>
+            Allergies
+            <textarea value={allergies} onChange={(event) => setAllergies(event.target.value)} rows={2} />
+          </label>
+          <label>
+            Clinical Notes
+            <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} />
+          </label>
           <div className="row-actions">
             <button type="submit" disabled={saving}>{saving ? 'Saving...' : editingPatientId ? 'Update Patient' : 'Create Patient'}</button>
             {editingPatientId ? (
@@ -278,43 +358,7 @@ export function PatientsPage() {
             ) : null}
           </div>
         </form>
-
-        <h2>Selected Patient</h2>
-        {selectedPatient ? (
-          <div>
-            <p><strong>{selectedPatient.patient.full_name}</strong></p>
-            <p>{selectedPatient.patient.email || 'No email'}</p>
-            <p>{selectedPatient.patient.phone || 'No phone'}</p>
-            <p>DOB: {selectedPatient.patient.dob || '-'}</p>
-            <p>Total visits: {selectedPatient.records.length}</p>
-
-            <h3 className="subsection-title">Visit Timeline</h3>
-            {selectedPatient.records.length ? (
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Diagnosis</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedPatient.records.map((record) => (
-                      <tr key={record.id}>
-                        <td>{record.last_visit}</td>
-                        <td>{record.diagnosis}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p>No visits recorded for this patient.</p>
-            )}
-          </div>
-        ) : (
-          <p>Select a patient row to see details.</p>
-        )}
+        <p className="hint-text">Click any patient row to open the full profile page.</p>
       </section>
     </div>
   )

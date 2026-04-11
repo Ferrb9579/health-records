@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import type { RiskPatientEntry } from '../types'
 
@@ -29,6 +30,7 @@ function riskClass(level: RiskPatientEntry['risk_level']) {
 }
 
 export function RiskPanelPage() {
+  const navigate = useNavigate()
   const [entries, setEntries] = useState<RiskPatientEntry[]>([])
   const [riskFilter, setRiskFilter] = useState<RiskLevelFilter>('all')
   const [search, setSearch] = useState('')
@@ -90,7 +92,9 @@ export function RiskPanelPage() {
         return riskLevelValue(b.risk_level) - riskLevelValue(a.risk_level)
       }
 
-      return b.days_since_last_visit - a.days_since_last_visit
+      const aDaysSince = a.days_since_last_visit ?? -1
+      const bDaysSince = b.days_since_last_visit ?? -1
+      return bDaysSince - aDaysSince
     })
   }, [visibleEntries])
 
@@ -155,7 +159,7 @@ export function RiskPanelPage() {
             </thead>
             <tbody>
               {sortedEntries.map((entry) => (
-                  <tr key={entry.id}>
+                  <tr key={entry.id} className="click-row" onClick={() => navigate(`/patients/${entry.id}`)}>
                     <td>{entry.full_name}</td>
                     <td>
                       <span className={`status-pill ${riskClass(entry.risk_level)}`}>
@@ -165,7 +169,7 @@ export function RiskPanelPage() {
                     <td>{entry.risk_score}</td>
                     <td>{entry.latest_diagnosis || '-'}</td>
                     <td>{entry.last_visit || 'Never'}</td>
-                    <td>{entry.days_since_last_visit}</td>
+                    <td>{entry.days_since_last_visit ?? '-'}</td>
                     <td>{entry.total_visits}</td>
                     <td>{entry.diagnosis_count}</td>
                   </tr>

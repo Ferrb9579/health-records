@@ -43,6 +43,10 @@ export function DashboardPage() {
               <p className="stat-value">{summary.totalVisits}</p>
             </article>
             <article>
+              <h3>Total Appointments</h3>
+              <p className="stat-value">{summary.totalAppointments}</p>
+            </article>
+            <article>
               <h3>Diagnosis Types</h3>
               <p className="stat-value">{summary.diagnosisCount}</p>
             </article>
@@ -86,6 +90,8 @@ export function DashboardPage() {
         <div className="quick-links-grid">
           <Link to="/patients">Manage patients</Link>
           <Link to="/visits">Log a visit</Link>
+          <Link to="/appointments">Schedule appointment</Link>
+          <Link to="/care-timeline">Browse care timeline</Link>
           <Link to="/analytics">View analytics</Link>
           <Link to="/preventive-care">Preventive care queue</Link>
           <Link to="/risk-panel">Population risk panel</Link>

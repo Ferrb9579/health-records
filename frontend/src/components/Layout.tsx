@@ -4,6 +4,8 @@ const navItems = [
   { to: '/', label: 'Dashboard' },
   { to: '/patients', label: 'Patients' },
   { to: '/visits', label: 'Visits' },
+  { to: '/appointments', label: 'Appointments' },
+  { to: '/care-timeline', label: 'Care Timeline' },
   { to: '/analytics', label: 'Analytics' },
   { to: '/preventive-care', label: 'Preventive Care' },
   { to: '/risk-panel', label: 'Risk Panel' },

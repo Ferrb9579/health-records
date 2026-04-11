@@ -135,7 +135,8 @@
 .inline-form input,
 .inline-form select,
 .record-form input,
-.record-form select {
+.record-form select,
+.record-form textarea {
   border: 1px solid #c6d8de;
   border-radius: 0.55rem;
   padding: 0.5rem 0.6rem;

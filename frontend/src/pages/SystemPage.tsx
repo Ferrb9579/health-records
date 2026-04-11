@@ -120,6 +120,10 @@ export function SystemPage() {
               <h3>Total Visits</h3>
               <p className="stat-value">{systemStatus.totalVisits}</p>
             </article>
+            <article>
+              <h3>Total Appointments</h3>
+              <p className="stat-value">{systemStatus.totalAppointments}</p>
+            </article>
           </div>
         ) : null}
       </section>

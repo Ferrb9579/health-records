@@ -1,4 +1,6 @@
 import type {
+  Appointment,
+  CareTimelineEvent,
   DailyVisits,
   DiagnosisStat,
   HealthRecord,
@@ -66,6 +68,14 @@ export const api = {
     email?: string
     phone?: string
     dob?: string
+    gender?: string
+    bloodType?: string
+    address?: string
+    emergencyContactName?: string
+    emergencyContactPhone?: string
+    insuranceProvider?: string
+    allergies?: string
+    notes?: string
   }) {
     return request<Patient>('/api/patients', {
       method: 'POST',
@@ -81,6 +91,14 @@ export const api = {
       email?: string
       phone?: string
       dob?: string
+      gender?: string
+      bloodType?: string
+      address?: string
+      emergencyContactName?: string
+      emergencyContactPhone?: string
+      insuranceProvider?: string
+      allergies?: string
+      notes?: string
     },
   ) {
     return request<Patient>(`/api/patients/${id}`, {
@@ -154,5 +172,63 @@ export const api = {
 
   async getRiskPanel(limit = 200) {
     return request<RiskPatientEntry[]>(`/api/health/risk-panel${buildQuery({ limit })}`)
+  },
+
+  async getAppointments(filters?: {
+    search?: string
+    status?: string
+    patientId?: number
+    fromDate?: string
+    toDate?: string
+    limit?: number
+  }) {
+    return request<Appointment[]>(`/api/appointments${buildQuery(filters ?? {})}`)
+  },
+
+  async createAppointment(payload: {
+    patientName?: string
+    patientId?: number
+    appointmentDate: string
+    reason: string
+    status?: string
+    notes?: string
+  }) {
+    return request<Appointment>('/api/appointments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+  },
+
+  async updateAppointment(
+    id: number,
+    payload: {
+      patientName?: string
+      patientId?: number
+      appointmentDate: string
+      reason: string
+      status?: string
+      notes?: string
+    },
+  ) {
+    return request<Appointment>(`/api/appointments/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+  },
+
+  async deleteAppointment(id: number) {
+    return request<{ deleted: true }>(`/api/appointments/${id}`, {
+      method: 'DELETE',
+    })
+  },
+
+  async getCareTimeline(filters?: {
+    patientId?: number
+    eventType?: 'visit' | 'appointment'
+    limit?: number
+  }) {
+    return request<CareTimelineEvent[]>(`/api/care/timeline${buildQuery(filters ?? {})}`)
   },
 }
