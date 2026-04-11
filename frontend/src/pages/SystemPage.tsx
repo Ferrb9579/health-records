@@ -13,6 +13,9 @@ export function SystemPage() {
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
   const [healthStatus, setHealthStatus] = useState<HealthStatus | null>(null)
   const [backendUpstream, setBackendUpstream] = useState('unknown')
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [refreshSeconds, setRefreshSeconds] = useState(15)
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -29,6 +32,7 @@ export function SystemPage() {
       setSystemStatus(systemResult.data)
       setHealthStatus(healthResult.data)
       setBackendUpstream(healthResult.headers.get('x-backend-upstream') ?? 'unknown')
+      setLastUpdatedAt(new Date())
     } catch {
       setError('Unable to fetch system status.')
     } finally {
@@ -40,14 +44,55 @@ export function SystemPage() {
     void loadStatus()
   }, [])
 
+  useEffect(() => {
+    if (!autoRefresh) {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      void loadStatus()
+    }, refreshSeconds * 1000)
+
+    return () => window.clearInterval(intervalId)
+  }, [autoRefresh, refreshSeconds])
+
+  const isFresh = lastUpdatedAt ? (Date.now() - lastUpdatedAt.getTime()) / 1000 < refreshSeconds * 2 : false
+
   return (
     <div className="page-grid">
       <section className="panel">
         <h2>System Status</h2>
-        <button type="button" onClick={() => void loadStatus()} className="ghost-button">Refresh status</button>
+        <div className="inline-form system-controls">
+          <button type="button" onClick={() => void loadStatus()} className="ghost-button">Refresh status</button>
+          <label className="toggle-label">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(event) => setAutoRefresh(event.target.checked)}
+            />
+            Auto-refresh
+          </label>
+          <label className="refresh-label">
+            Interval
+            <select
+              value={refreshSeconds}
+              onChange={(event) => setRefreshSeconds(Number(event.target.value))}
+              disabled={!autoRefresh}
+            >
+              <option value={10}>10s</option>
+              <option value={15}>15s</option>
+              <option value={30}>30s</option>
+            </select>
+          </label>
+        </div>
 
         {loading ? <p>Loading status...</p> : null}
         {error ? <p className="error">{error}</p> : null}
+        {lastUpdatedAt ? (
+          <p className={`status-pill ${isFresh ? 'status-ok' : 'status-stale'}`}>
+            Last updated: {lastUpdatedAt.toLocaleTimeString()} ({isFresh ? 'fresh' : 'stale'})
+          </p>
+        ) : null}
 
         {systemStatus ? (
           <div className="stats-row compact">

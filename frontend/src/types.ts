@@ -50,3 +50,26 @@ export type HealthStatus = {
   instance: string
   db: string
 }
+
+export type PreventiveCareEntry = {
+  id: number
+  full_name: string
+  email: string | null
+  phone: string | null
+  last_visit: string | null
+  days_since_last_visit: number
+  total_visits: number
+  status: 'ok' | 'soon' | 'due' | 'no-history'
+}
+
+export type RiskPatientEntry = {
+  id: number
+  full_name: string
+  latest_diagnosis: string | null
+  last_visit: string | null
+  days_since_last_visit: number
+  total_visits: number
+  diagnosis_count: number
+  risk_score: number
+  risk_level: 'low' | 'medium' | 'high'
+}

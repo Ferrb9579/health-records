@@ -5,6 +5,8 @@ import type {
   HealthStatus,
   Patient,
   PatientDetails,
+  PreventiveCareEntry,
+  RiskPatientEntry,
   Summary,
   SystemStatus,
 } from './types'
@@ -72,6 +74,28 @@ export const api = {
     })
   },
 
+  async updatePatient(
+    id: number,
+    payload: {
+      fullName: string
+      email?: string
+      phone?: string
+      dob?: string
+    },
+  ) {
+    return request<Patient>(`/api/patients/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+  },
+
+  async deletePatient(id: number) {
+    return request<{ deleted: true }>(`/api/patients/${id}`, {
+      method: 'DELETE',
+    })
+  },
+
   async getRecords(filters?: {
     search?: string
     diagnosis?: string
@@ -94,11 +118,41 @@ export const api = {
     })
   },
 
+  async updateRecord(
+    id: number,
+    payload: {
+      patientName?: string
+      patientId?: number
+      diagnosis: string
+      lastVisit: string
+    },
+  ) {
+    return request<HealthRecord>(`/api/records/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+  },
+
+  async deleteRecord(id: number) {
+    return request<{ deleted: true }>(`/api/records/${id}`, {
+      method: 'DELETE',
+    })
+  },
+
   async getDiagnosisStats() {
     return request<DiagnosisStat[]>('/api/analytics/diagnoses')
   },
 
   async getVisitsByDay(days = 14) {
     return request<DailyVisits[]>(`/api/analytics/visits-by-day${buildQuery({ days })}`)
+  },
+
+  async getPreventiveCare(filters?: { days?: number; search?: string; limit?: number }) {
+    return request<PreventiveCareEntry[]>(`/api/health/preventive-care${buildQuery(filters ?? {})}`)
+  },
+
+  async getRiskPanel(limit = 200) {
+    return request<RiskPatientEntry[]>(`/api/health/risk-panel${buildQuery({ limit })}`)
   },
 }

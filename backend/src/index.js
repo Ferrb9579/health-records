@@ -28,6 +28,16 @@ function normalizeDays(value, fallback = 14) {
   return Math.min(parsed, 90)
 }
 
+function normalizeThreshold(value, fallback = 180, max = 365) {
+  const parsed = Number(value)
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return fallback
+  }
+
+  return Math.min(parsed, max)
+}
+
 app.get('/api/summary', async (req, res) => {
   const [patientResult, recordResult, diagnosisResult, recentResult] = await Promise.all([
     pool.query('SELECT COUNT(*)::int AS total FROM patients'),
@@ -92,6 +102,180 @@ app.get('/api/system/status', async (req, res) => {
     totalPatients: patients.rows[0].total,
     totalVisits: records.rows[0].total,
   })
+})
+
+app.get('/api/health/preventive-care', async (req, res) => {
+  const search = (req.query.search || '').toString().trim()
+  const days = normalizeThreshold(req.query.days)
+  const limit = normalizeLimit(req.query.limit, 200, 300)
+  const params = [days]
+  const where = []
+
+  if (search) {
+    params.push(`%${search}%`)
+    where.push(`(
+      p.full_name ILIKE $${params.length}
+      OR COALESCE(p.email, '') ILIKE $${params.length}
+      OR COALESCE(p.phone, '') ILIKE $${params.length}
+    )`)
+  }
+
+  params.push(limit)
+
+  const result = await pool.query(
+    `
+      SELECT
+        p.id,
+        p.full_name,
+        p.email,
+        p.phone,
+        to_char(MAX(hr.last_visit), 'YYYY-MM-DD') AS last_visit,
+        COALESCE((CURRENT_DATE - MAX(hr.last_visit)), 9999)::int AS days_since_last_visit,
+        COUNT(hr.id)::int AS total_visits,
+        CASE
+          WHEN MAX(hr.last_visit) IS NULL THEN 'no-history'
+          WHEN (CURRENT_DATE - MAX(hr.last_visit)) > $1::int THEN 'due'
+          WHEN (CURRENT_DATE - MAX(hr.last_visit)) > GREATEST(($1::int / 2), 14) THEN 'soon'
+          ELSE 'ok'
+        END AS status
+      FROM patients p
+      LEFT JOIN health_records hr ON hr.patient_id = p.id
+      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      GROUP BY p.id
+      ORDER BY
+        CASE
+          WHEN MAX(hr.last_visit) IS NULL THEN 1
+          WHEN (CURRENT_DATE - MAX(hr.last_visit)) > $1::int THEN 2
+          WHEN (CURRENT_DATE - MAX(hr.last_visit)) > GREATEST(($1::int / 2), 14) THEN 3
+          ELSE 4
+        END,
+        days_since_last_visit DESC,
+        p.full_name ASC
+      LIMIT $${params.length}
+    `,
+    params,
+  )
+
+  res.json(result.rows)
+})
+
+app.get('/api/health/risk-panel', async (req, res) => {
+  const limit = normalizeLimit(req.query.limit, 200, 300)
+
+  const result = await pool.query(
+    `
+      SELECT
+        p.id,
+        p.full_name,
+        latest.latest_diagnosis,
+        to_char(stats.last_visit, 'YYYY-MM-DD') AS last_visit,
+        COALESCE((CURRENT_DATE - stats.last_visit), 9999)::int AS days_since_last_visit,
+        stats.total_visits,
+        stats.diagnosis_count,
+        (
+          CASE
+            WHEN stats.last_visit IS NULL THEN 3
+            WHEN (CURRENT_DATE - stats.last_visit) > 90 THEN 3
+            WHEN (CURRENT_DATE - stats.last_visit) > 45 THEN 2
+            WHEN (CURRENT_DATE - stats.last_visit) > 20 THEN 1
+            ELSE 0
+          END
+          + CASE
+            WHEN stats.diagnosis_count >= 4 THEN 2
+            WHEN stats.diagnosis_count >= 2 THEN 1
+            ELSE 0
+          END
+          + CASE
+            WHEN stats.chronic_flags > 0 THEN 2
+            ELSE 0
+          END
+          + CASE
+            WHEN stats.total_visits = 0 THEN 1
+            ELSE 0
+          END
+        )::int AS risk_score,
+        CASE
+          WHEN (
+            CASE
+              WHEN stats.last_visit IS NULL THEN 3
+              WHEN (CURRENT_DATE - stats.last_visit) > 90 THEN 3
+              WHEN (CURRENT_DATE - stats.last_visit) > 45 THEN 2
+              WHEN (CURRENT_DATE - stats.last_visit) > 20 THEN 1
+              ELSE 0
+            END
+            + CASE
+              WHEN stats.diagnosis_count >= 4 THEN 2
+              WHEN stats.diagnosis_count >= 2 THEN 1
+              ELSE 0
+            END
+            + CASE
+              WHEN stats.chronic_flags > 0 THEN 2
+              ELSE 0
+            END
+            + CASE
+              WHEN stats.total_visits = 0 THEN 1
+              ELSE 0
+            END
+          ) >= 6 THEN 'high'
+          WHEN (
+            CASE
+              WHEN stats.last_visit IS NULL THEN 3
+              WHEN (CURRENT_DATE - stats.last_visit) > 90 THEN 3
+              WHEN (CURRENT_DATE - stats.last_visit) > 45 THEN 2
+              WHEN (CURRENT_DATE - stats.last_visit) > 20 THEN 1
+              ELSE 0
+            END
+            + CASE
+              WHEN stats.diagnosis_count >= 4 THEN 2
+              WHEN stats.diagnosis_count >= 2 THEN 1
+              ELSE 0
+            END
+            + CASE
+              WHEN stats.chronic_flags > 0 THEN 2
+              ELSE 0
+            END
+            + CASE
+              WHEN stats.total_visits = 0 THEN 1
+              ELSE 0
+            END
+          ) >= 3 THEN 'medium'
+          ELSE 'low'
+        END AS risk_level
+      FROM patients p
+      LEFT JOIN (
+        SELECT
+          hr.patient_id,
+          MAX(hr.last_visit) AS last_visit,
+          COUNT(hr.id)::int AS total_visits,
+          COUNT(DISTINCT hr.diagnosis)::int AS diagnosis_count,
+          SUM(
+            CASE
+              WHEN hr.diagnosis ILIKE '%diab%'
+                OR hr.diagnosis ILIKE '%hypert%'
+                OR hr.diagnosis ILIKE '%asthma%'
+                OR hr.diagnosis ILIKE '%cardio%'
+                OR hr.diagnosis ILIKE '%heart%'
+              THEN 1
+              ELSE 0
+            END
+          )::int AS chronic_flags
+        FROM health_records hr
+        GROUP BY hr.patient_id
+      ) stats ON stats.patient_id = p.id
+      LEFT JOIN LATERAL (
+        SELECT hr2.diagnosis AS latest_diagnosis
+        FROM health_records hr2
+        WHERE hr2.patient_id = p.id
+        ORDER BY hr2.last_visit DESC, hr2.id DESC
+        LIMIT 1
+      ) latest ON TRUE
+      ORDER BY risk_score DESC, days_since_last_visit DESC, p.full_name ASC
+      LIMIT $1
+    `,
+    [limit],
+  )
+
+  res.json(result.rows)
 })
 
 app.get('/api/patients', async (req, res) => {
@@ -217,6 +401,86 @@ app.post('/api/patients', async (req, res) => {
   res.status(201).json(result.rows[0])
 })
 
+app.put('/api/patients/:id', async (req, res) => {
+  const patientId = Number(req.params.id)
+  const fullName = (req.body.fullName || '').toString().trim()
+  const email = (req.body.email || '').toString().trim() || null
+  const phone = (req.body.phone || '').toString().trim() || null
+  const dob = (req.body.dob || '').toString().trim() || null
+
+  if (!Number.isInteger(patientId) || patientId <= 0) {
+    res.status(400).json({ message: 'Invalid patient id' })
+    return
+  }
+
+  if (!fullName) {
+    res.status(400).json({ message: 'fullName is required' })
+    return
+  }
+
+  const result = await pool.query(
+    `
+      UPDATE patients
+      SET
+        full_name = $2,
+        email = $3,
+        phone = $4,
+        dob = $5
+      WHERE id = $1
+      RETURNING
+        id,
+        full_name,
+        email,
+        phone,
+        to_char(dob, 'YYYY-MM-DD') AS dob
+    `,
+    [patientId, fullName, email, phone, dob],
+  )
+
+  if (result.rows.length === 0) {
+    res.status(404).json({ message: 'Patient not found' })
+    return
+  }
+
+  await pool.query(
+    `
+      UPDATE health_records
+      SET patient_name = $2
+      WHERE patient_id = $1
+    `,
+    [patientId, result.rows[0].full_name],
+  )
+
+  res.json(result.rows[0])
+})
+
+app.delete('/api/patients/:id', async (req, res) => {
+  const patientId = Number(req.params.id)
+
+  if (!Number.isInteger(patientId) || patientId <= 0) {
+    res.status(400).json({ message: 'Invalid patient id' })
+    return
+  }
+
+  const deleteResult = await pool.query('DELETE FROM patients WHERE id = $1 RETURNING id', [patientId])
+
+  if (deleteResult.rows.length === 0) {
+    res.status(404).json({ message: 'Patient not found' })
+    return
+  }
+
+  await pool.query(
+    `
+      UPDATE health_records
+      SET patient_id = NULL
+      WHERE patient_id = $1
+    `,
+    [patientId],
+  )
+
+  res.json({ deleted: true })
+})
+
 app.get('/api/records', async (req, res) => {
   const search = (req.query.search || '').toString().trim()
   const diagnosis = (req.query.diagnosis || '').toString().trim()
@@ -331,6 +595,107 @@ app.post('/api/records', async (req, res) => {
   )
 
   res.status(201).json(result.rows[0])
+})
+
+app.put('/api/records/:id', async (req, res) => {
+  const recordId = Number(req.params.id)
+  const diagnosis = (req.body.diagnosis || '').toString().trim()
+  const lastVisit = (req.body.lastVisit || '').toString().trim()
+  const patientNameInput = (req.body.patientName || '').toString().trim()
+  const patientIdInput = Number(req.body.patientId)
+
+  if (!Number.isInteger(recordId) || recordId <= 0) {
+    res.status(400).json({ message: 'Invalid record id' })
+    return
+  }
+
+  if (!diagnosis || !lastVisit) {
+    res.status(400).json({ message: 'diagnosis and lastVisit are required' })
+    return
+  }
+
+  let patientId = null
+  let patientName = patientNameInput
+
+  if (Number.isInteger(patientIdInput) && patientIdInput > 0) {
+    const patientResult = await pool.query(
+      'SELECT id, full_name FROM patients WHERE id = $1',
+      [patientIdInput],
+    )
+
+    if (patientResult.rows.length === 0) {
+      res.status(404).json({ message: 'Patient not found for given patientId' })
+      return
+    }
+
+    patientId = patientResult.rows[0].id
+    patientName = patientResult.rows[0].full_name
+  }
+
+  if (!patientName) {
+    res.status(400).json({ message: 'patientName or patientId is required' })
+    return
+  }
+
+  if (!patientId) {
+    const patientResult = await pool.query(
+      `
+        INSERT INTO patients (full_name)
+        VALUES ($1)
+        ON CONFLICT (full_name)
+        DO UPDATE SET full_name = EXCLUDED.full_name
+        RETURNING id, full_name
+      `,
+      [patientName],
+    )
+
+    patientId = patientResult.rows[0].id
+    patientName = patientResult.rows[0].full_name
+  }
+
+  const result = await pool.query(
+    `
+      UPDATE health_records
+      SET
+        patient_id = $2,
+        patient_name = $3,
+        diagnosis = $4,
+        last_visit = $5
+      WHERE id = $1
+      RETURNING
+        id,
+        patient_id,
+        patient_name,
+        diagnosis,
+        to_char(last_visit, 'YYYY-MM-DD') AS last_visit
+    `,
+    [recordId, patientId, patientName, diagnosis, lastVisit],
+  )
+
+  if (result.rows.length === 0) {
+    res.status(404).json({ message: 'Record not found' })
+    return
+  }
+
+  res.json(result.rows[0])
+})
+
+app.delete('/api/records/:id', async (req, res) => {
+  const recordId = Number(req.params.id)
+
+  if (!Number.isInteger(recordId) || recordId <= 0) {
+    res.status(400).json({ message: 'Invalid record id' })
+    return
+  }
+
+  const result = await pool.query('DELETE FROM health_records WHERE id = $1 RETURNING id', [recordId])
+
+  if (result.rows.length === 0) {
+    res.status(404).json({ message: 'Record not found' })
+    return
+  }
+
+  res.json({ deleted: true })
 })
 
 app.get('/api/analytics/diagnoses', async (req, res) => {

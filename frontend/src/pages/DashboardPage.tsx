@@ -87,6 +87,8 @@ export function DashboardPage() {
           <Link to="/patients">Manage patients</Link>
           <Link to="/visits">Log a visit</Link>
           <Link to="/analytics">View analytics</Link>
+          <Link to="/preventive-care">Preventive care queue</Link>
+          <Link to="/risk-panel">Population risk panel</Link>
           <Link to="/system">Check replica health</Link>
         </div>
       </section>
